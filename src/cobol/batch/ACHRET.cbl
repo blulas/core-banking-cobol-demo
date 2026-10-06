@@ -103,7 +103,7 @@
            05  WS-OUR-ABA                  PIC X(09) VALUE '026000013'.
            05  WS-OUR-DFI                  PIC X(08) VALUE '02600001'.
            05  WS-OUR-NAME                 PIC X(23)
-                                   VALUE 'GRANITE STREET BANK NA'.
+                                   VALUE 'GOLDMAN SACHS BANK USA'.
            05  WS-FED-ACH-ABA              PIC X(09) VALUE '076000005'.
            05  WS-FED-ACH-NAME             PIC X(23)
                                            VALUE 'FRB ACH OPERATOR'.

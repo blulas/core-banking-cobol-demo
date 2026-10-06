@@ -1,6 +1,6 @@
 # Core Banking System (COBOL) — CoreStory Demo
 
-A synthetic z/OS-style core banking system for **Granite Street Bank NA**, written in COBOL with CICS, DB2, JCL and VSAM artifacts. It is a CoreStory demo codebase: big enough to look like a real mainframe estate, small enough to read.
+A synthetic z/OS-style core banking system for **Goldman Sachs Bank USA**, written in COBOL with CICS, DB2, JCL and VSAM artifacts. It is a CoreStory demo codebase: big enough to look like a real mainframe estate, small enough to read.
 
 The parts that GnuCOBOL can run build and run on a laptop: batch programs, business-rule modules, data-load utilities and unit tests. Shell scripts stand in for JCL and VSAM. The online (CICS/DB2) programs, BMS maps, DDL and JCL are kept for analysis only.
 

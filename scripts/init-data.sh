@@ -22,7 +22,7 @@ mkdir -p "$CB_WORK/master" "$CB_WORK/output"
 # the first EOD run exercises month-end and quarter-end processing.
 #        id      bank date      prev       next     cyc ME QE YE ach  sdach wire  fedfunds prime   sofr    ecr     lastseq mode
 printf '%-8s%-4s%08d%08d%08d%s%s%s%s%04d%04d%04d%09d%09d%09d%09d%012d%s%-20s\n' \
-  BANKCTL1 GSBK "$BUSDATE" "$PREVDATE" "$NEXTDATE" O Y Y N 1600 1430 1745 \
+  BANKCTL1 GSBU "$BUSDATE" "$PREVDATE" "$NEXTDATE" O Y Y N 1600 1430 1745 \
   4330000 7500000 4300000 2500000 0 P "" > "$DD_BANKCTL"
 
 LDPROD

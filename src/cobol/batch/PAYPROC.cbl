@@ -127,9 +127,9 @@
            05  WS-OUR-ABA                  PIC X(09) VALUE '026000013'.
            05  WS-OUR-DFI                  PIC X(08) VALUE '02600001'.
            05  WS-OUR-SHORT-NAME           PIC X(18)
-                                           VALUE 'GRANITE ST BK'.
+                                           VALUE 'GOLDMAN SACHS BK'.
            05  WS-OUR-NAME                 PIC X(23)
-                                   VALUE 'GRANITE STREET BANK NA'.
+                                   VALUE 'GOLDMAN SACHS BANK USA'.
            05  WS-FED-ACH-ABA              PIC X(09) VALUE '076000005'.
            05  WS-FED-ACH-NAME             PIC X(23)
                                            VALUE 'FRB ACH OPERATOR'.
@@ -137,7 +137,7 @@
            05  WS-CORRESP-ABA              PIC X(09) VALUE '026009991'.
            05  WS-CORRESP-NAME             PIC X(18)
                                            VALUE 'FICT CORRESP NY'.
-           05  WS-FEDWIRE-LTERM            PIC X(08) VALUE 'GSBKQ001'.
+           05  WS-FEDWIRE-LTERM            PIC X(08) VALUE 'GSBUQ001'.
            05  WS-SEQ-BASE                 PIC 9(08) VALUE 15000000.
       *    OUTGOING WIRE FEES - SEE FEE SCHEDULE FS-2004-03
            05  WS-WIRE-FEE-DOMESTIC        PIC S9(07)V99 COMP-3
