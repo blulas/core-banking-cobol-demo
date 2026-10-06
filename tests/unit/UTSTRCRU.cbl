@@ -1,0 +1,303 @@
+      *================================================================*
+      * PROGRAM  : UTSTRCRU                                            *
+      * TYPE     : UNIT TEST DRIVER                                    *
+      * PURPOSE  : UNIT TESTS FOR STRCRULE - STRUCTURING DETECTION     *
+      *----------------------------------------------------------------*
+      * CHANGE LOG                                                     *
+      * 2009-06-15 DPS  ORIGINAL                                       *
+      * 2021-02-02 AKW  INC40877 S2 BUSINESS-DAY WINDOW CASES          *
+      *================================================================*
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. UTSTRCRU.
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       COPY TESTPARM.
+       COPY STRPARM.
+       01  WS-ADD-ITEM.
+           05  WS-ADD-DATE                 PIC 9(08).
+           05  WS-ADD-DR-CR                PIC X(01).
+           05  WS-ADD-AMOUNT               PIC S9(13)V99 COMP-3.
+           05  WS-ADD-BRANCH               PIC X(05).
+
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           MOVE 'INIT' TO TST-FUNCTION
+           MOVE 'STRCRULE' TO TST-SUITE-NAME
+           CALL 'TESTLIB' USING TEST-PARMS
+
+           PERFORM 1000-TEST-DELACROIX-PATTERN
+           PERFORM 1100-TEST-NO-ACTIVITY-TODAY
+           PERFORM 1200-TEST-S1-BAND
+           PERFORM 1300-TEST-S2-ROLLING
+           PERFORM 1400-TEST-S3-BRANCHES
+           PERFORM 1500-TEST-S4-ROUND
+           PERFORM 1600-TEST-INVALID
+
+           MOVE 'SUMM' TO TST-FUNCTION
+           CALL 'TESTLIB' USING TEST-PARMS
+           STOP RUN.
+
+      *----------------------------------------------------------------*
+      * DELACROIX: 9,500 / 9,800 / 9,200 AND 9,400 TODAY               *
+      *----------------------------------------------------------------*
+       1000-TEST-DELACROIX-PATTERN.
+           PERFORM 8000-RESET
+           MOVE 20260922 TO WS-ADD-DATE
+           MOVE 9500.00  TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           MOVE 20260924 TO WS-ADD-DATE
+           MOVE 9800.00  TO WS-ADD-AMOUNT
+           MOVE 'B0102'  TO WS-ADD-BRANCH
+           PERFORM 8100-ADD
+           MOVE 20260928 TO WS-ADD-DATE
+           MOVE 9200.00  TO WS-ADD-AMOUNT
+           MOVE 'B0310'  TO WS-ADD-BRANCH
+           PERFORM 8100-ADD
+           MOVE 20260930 TO WS-ADD-DATE
+           MOVE 9400.00  TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           CALL 'STRCRULE' USING STRC-RULE-PARMS
+           MOVE 'DELACROIX PATTERN CODES S1 S2 S4' TO TST-CASE-NAME
+           MOVE 'S1S2S4' TO TST-EXPECTED
+           MOVE STP-PATTERN-CODES TO TST-ACTUAL
+           PERFORM 9100-AEQ
+           MOVE 'DELACROIX BAND DAYS = 4' TO TST-CASE-NAME
+           MOVE 4 TO TST-EXP-NUM
+           MOVE STP-BAND-DAYS TO TST-ACT-NUM
+           PERFORM 9000-NEQ
+           MOVE 'DELACROIX SCORE 85 (40+30+15)' TO TST-CASE-NAME
+           MOVE 85 TO TST-EXP-NUM
+           MOVE STP-SCORE TO TST-ACT-NUM
+           PERFORM 9000-NEQ
+           MOVE 'DELACROIX SEVERITY HIGH' TO TST-CASE-NAME
+           MOVE 'H' TO TST-EXPECTED
+           MOVE STP-SEVERITY TO TST-ACTUAL
+           PERFORM 9100-AEQ
+           MOVE 'PATTERN FOUND RETURNS RC 04' TO TST-CASE-NAME
+           MOVE 4 TO TST-EXP-NUM
+           MOVE STP-RETURN-CODE TO TST-ACT-NUM
+           PERFORM 9000-NEQ
+           MOVE 'ROLLING 5-BUSINESS-DAY CASH IN 28,400 (0924-0930)'
+             TO TST-CASE-NAME
+           MOVE 28400.00 TO TST-EXP-NUM
+           MOVE STP-ROLLING-CASH-IN TO TST-ACT-NUM
+           PERFORM 9000-NEQ.
+
+      *----------------------------------------------------------------*
+       1100-TEST-NO-ACTIVITY-TODAY.
+           PERFORM 8000-RESET
+           MOVE 20260924 TO WS-ADD-DATE
+           MOVE 9800.00  TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           MOVE 20260928 TO WS-ADD-DATE
+           MOVE 9200.00  TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           CALL 'STRCRULE' USING STRC-RULE-PARMS
+           MOVE 'NO CASH TODAY - NO PATTERN RAISED' TO TST-CASE-NAME
+           MOVE 0 TO TST-EXP-NUM
+           MOVE STP-PATTERN-COUNT TO TST-ACT-NUM
+           PERFORM 9000-NEQ.
+
+      *----------------------------------------------------------------*
+       1200-TEST-S1-BAND.
+           PERFORM 8000-RESET
+           MOVE 20260928 TO WS-ADD-DATE
+           MOVE 7999.99  TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           MOVE 20260930 TO WS-ADD-DATE
+           PERFORM 8100-ADD
+           CALL 'STRCRULE' USING STRC-RULE-PARMS
+           MOVE 'S1 NOT RAISED FOR 7,999.99 DEPOSITS' TO TST-CASE-NAME
+           MOVE 0 TO TST-EXP-NUM
+           MOVE STP-BAND-DAYS TO TST-ACT-NUM
+           PERFORM 9000-NEQ
+
+           PERFORM 8000-RESET
+           MOVE 20260928 TO WS-ADD-DATE
+           MOVE 8000.00  TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           MOVE 20260930 TO WS-ADD-DATE
+           PERFORM 8100-ADD
+           CALL 'STRCRULE' USING STRC-RULE-PARMS
+           MOVE 'S1 RAISED FOR 8,000.00 ON TWO DAYS' TO TST-CASE-NAME
+           MOVE 'S1' TO TST-EXPECTED
+           MOVE STP-PATTERN-CODE(1) TO TST-ACTUAL
+           PERFORM 9100-AEQ
+
+      *    ONLY ONE BAND DEPOSIT INSIDE THE 10-DAY WINDOW (0921-0930)
+           PERFORM 8000-RESET
+           MOVE 20260920 TO WS-ADD-DATE
+           MOVE 8500.00  TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           MOVE 20260930 TO WS-ADD-DATE
+           MOVE 8500.00  TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           CALL 'STRCRULE' USING STRC-RULE-PARMS
+           MOVE 'S1 BAND DEPOSIT 10 DAYS AGO IS OUTSIDE WINDOW'
+             TO TST-CASE-NAME
+           MOVE 1 TO TST-EXP-NUM
+           MOVE STP-BAND-DAYS TO TST-ACT-NUM
+           PERFORM 9000-NEQ
+
+      *    TWO BAND DEPOSITS SAME DAY = ONE BAND DAY
+           PERFORM 8000-RESET
+           MOVE 20260930 TO WS-ADD-DATE
+           MOVE 8500.00  TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           PERFORM 8100-ADD
+           CALL 'STRCRULE' USING STRC-RULE-PARMS
+           MOVE 'S1 TWO BAND DEPOSITS SAME DAY COUNT AS ONE DAY'
+             TO TST-CASE-NAME
+           MOVE 1 TO TST-EXP-NUM
+           MOVE STP-BAND-DAYS TO TST-ACT-NUM
+           PERFORM 9000-NEQ.
+
+      *----------------------------------------------------------------*
+       1300-TEST-S2-ROLLING.
+      *    CASH OUT 4,000 ON 3 DAYS IN 5 BUSINESS DAYS = 12,000
+           PERFORM 8000-RESET
+           MOVE 'D' TO WS-ADD-DR-CR
+           MOVE 4000.00  TO WS-ADD-AMOUNT
+           MOVE 20260925 TO WS-ADD-DATE
+           PERFORM 8100-ADD
+           MOVE 20260929 TO WS-ADD-DATE
+           PERFORM 8100-ADD
+           MOVE 20260930 TO WS-ADD-DATE
+           PERFORM 8100-ADD
+           CALL 'STRCRULE' USING STRC-RULE-PARMS
+           MOVE 'S2 CASH OUT 12,000 OVER 5 BUS DAYS, NO DAY > 10K'
+             TO TST-CASE-NAME
+           MOVE 'S2' TO TST-EXPECTED
+           MOVE STP-PATTERN-CODES TO TST-ACTUAL
+           PERFORM 9100-AEQ
+
+      *    ONE DAY ALREADY OVER 10,000 (CTR FILED) - NOT STRUCTURING
+           PERFORM 8000-RESET
+           MOVE 12000.00 TO WS-ADD-AMOUNT
+           MOVE 20260929 TO WS-ADD-DATE
+           PERFORM 8100-ADD
+           MOVE 2000.00  TO WS-ADD-AMOUNT
+           MOVE 20260930 TO WS-ADD-DATE
+           PERFORM 8100-ADD
+           CALL 'STRCRULE' USING STRC-RULE-PARMS
+           MOVE 'S2 NOT RAISED WHEN A SINGLE DAY EXCEEDED 10,000'
+             TO TST-CASE-NAME
+           MOVE 0 TO TST-EXP-NUM
+           MOVE STP-PATTERN-COUNT TO TST-ACT-NUM
+           PERFORM 9000-NEQ
+
+      *    ITEM 5 BUSINESS DAYS BACK (0923) IS OUTSIDE THE WINDOW
+           PERFORM 8000-RESET
+           MOVE 6000.00  TO WS-ADD-AMOUNT
+           MOVE 20260923 TO WS-ADD-DATE
+           PERFORM 8100-ADD
+           MOVE 4500.00  TO WS-ADD-AMOUNT
+           MOVE 20260930 TO WS-ADD-DATE
+           PERFORM 8100-ADD
+           CALL 'STRCRULE' USING STRC-RULE-PARMS
+           MOVE 'S2 WINDOW IS 5 BUSINESS DAYS (0924-0930)'
+             TO TST-CASE-NAME
+           MOVE 4500.00 TO TST-EXP-NUM
+           MOVE STP-ROLLING-CASH-IN TO TST-ACT-NUM
+           PERFORM 9000-NEQ.
+
+      *----------------------------------------------------------------*
+       1400-TEST-S3-BRANCHES.
+           PERFORM 8000-RESET
+           MOVE 20260930 TO WS-ADD-DATE
+           MOVE 6000.00  TO WS-ADD-AMOUNT
+           MOVE 'B0101'  TO WS-ADD-BRANCH
+           PERFORM 8100-ADD
+           MOVE 5500.00  TO WS-ADD-AMOUNT
+           MOVE 'B0204'  TO WS-ADD-BRANCH
+           PERFORM 8100-ADD
+           CALL 'STRCRULE' USING STRC-RULE-PARMS
+           MOVE 'S3 6,000 + 5,500 AT TWO BRANCHES SAME DAY'
+             TO TST-CASE-NAME
+           MOVE 'S3' TO TST-EXPECTED
+           MOVE STP-PATTERN-CODES TO TST-ACTUAL
+           PERFORM 9100-AEQ
+
+           PERFORM 8000-RESET
+           MOVE 20260930 TO WS-ADD-DATE
+           MOVE 6000.00  TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           MOVE 5500.00  TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           CALL 'STRCRULE' USING STRC-RULE-PARMS
+           MOVE 'S3 NOT RAISED WHEN BOTH AT THE SAME BRANCH'
+             TO TST-CASE-NAME
+           MOVE 1 TO TST-EXP-NUM
+           MOVE STP-TODAY-BRANCHES TO TST-ACT-NUM
+           PERFORM 9000-NEQ.
+
+      *----------------------------------------------------------------*
+       1500-TEST-S4-ROUND.
+           PERFORM 8000-RESET
+           MOVE 3000.00  TO WS-ADD-AMOUNT
+           MOVE 20260925 TO WS-ADD-DATE
+           PERFORM 8100-ADD
+           MOVE 20260928 TO WS-ADD-DATE
+           PERFORM 8100-ADD
+           MOVE 20260930 TO WS-ADD-DATE
+           PERFORM 8100-ADD
+           CALL 'STRCRULE' USING STRC-RULE-PARMS
+           MOVE 'S4 THREE ROUND 3,000 DEPOSITS IN 7 DAYS'
+             TO TST-CASE-NAME
+           MOVE 'S4' TO TST-EXPECTED
+           MOVE STP-PATTERN-CODES TO TST-ACTUAL
+           PERFORM 9100-AEQ
+           MOVE 'S4 ONLY - SEVERITY LOW (SCORE 15)' TO TST-CASE-NAME
+           MOVE 'L' TO TST-EXPECTED
+           MOVE STP-SEVERITY TO TST-ACTUAL
+           PERFORM 9100-AEQ
+
+           PERFORM 8000-RESET
+           MOVE 3000.50  TO WS-ADD-AMOUNT
+           MOVE 20260925 TO WS-ADD-DATE
+           PERFORM 8100-ADD
+           MOVE 20260928 TO WS-ADD-DATE
+           PERFORM 8100-ADD
+           MOVE 20260930 TO WS-ADD-DATE
+           PERFORM 8100-ADD
+           CALL 'STRCRULE' USING STRC-RULE-PARMS
+           MOVE 'S4 NOT ROUND WHEN CENTS PRESENT' TO TST-CASE-NAME
+           MOVE 0 TO TST-EXP-NUM
+           MOVE STP-ROUND-COUNT TO TST-ACT-NUM
+           PERFORM 9000-NEQ.
+
+      *----------------------------------------------------------------*
+       1600-TEST-INVALID.
+           PERFORM 8000-RESET
+           MOVE 20261340 TO STP-BUSINESS-DATE
+           CALL 'STRCRULE' USING STRC-RULE-PARMS
+           MOVE 'INVALID BUSINESS DATE RETURNS RC 12' TO TST-CASE-NAME
+           MOVE 12 TO TST-EXP-NUM
+           MOVE STP-RETURN-CODE TO TST-ACT-NUM
+           PERFORM 9000-NEQ.
+
+      *----------------------------------------------------------------*
+       8000-RESET.
+           INITIALIZE STRC-RULE-PARMS
+           MOVE 20260930     TO STP-BUSINESS-DATE
+           MOVE 'C000000008' TO STP-CUST-ID
+           MOVE 'C'          TO WS-ADD-DR-CR
+           MOVE 'B0101'      TO WS-ADD-BRANCH.
+
+       8100-ADD.
+           ADD 1 TO STP-ITEM-COUNT
+           MOVE WS-ADD-DATE   TO STP-ITEM-DATE(STP-ITEM-COUNT)
+           MOVE WS-ADD-DR-CR  TO STP-ITEM-DR-CR(STP-ITEM-COUNT)
+           MOVE WS-ADD-AMOUNT TO STP-ITEM-AMOUNT(STP-ITEM-COUNT)
+           MOVE WS-ADD-BRANCH TO STP-ITEM-BRANCH(STP-ITEM-COUNT)
+           MOVE '100000000016' TO STP-ITEM-ACCT(STP-ITEM-COUNT).
+
+       9000-NEQ.
+           MOVE 'NEQ' TO TST-FUNCTION
+           CALL 'TESTLIB' USING TEST-PARMS.
+
+       9100-AEQ.
+           MOVE 'AEQ' TO TST-FUNCTION
+           CALL 'TESTLIB' USING TEST-PARMS
+           MOVE SPACES TO TST-EXPECTED TST-ACTUAL.

@@ -1,0 +1,6 @@
+build/
+data/master/
+data/output/
+*.dylib
+*.so
+.DS_Store

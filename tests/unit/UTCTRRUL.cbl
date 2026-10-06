@@ -1,0 +1,310 @@
+      *================================================================*
+      * PROGRAM  : UTCTRRUL                                            *
+      * TYPE     : UNIT TEST DRIVER                                    *
+      * PURPOSE  : UNIT TESTS FOR CTRRULE - CTR DETERMINATION          *
+      *----------------------------------------------------------------*
+      * CHANGE LOG                                                     *
+      * 2012-04-02 DPS  ORIGINAL                                       *
+      * 2019-10-07 AKW  MSB EXEMPTION CASES                            *
+      *================================================================*
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. UTCTRRUL.
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       COPY TESTPARM.
+       COPY CTRPARM.
+       01  WS-ADD-ITEM.
+           05  WS-ADD-ACCT                 PIC X(12).
+           05  WS-ADD-DR-CR                PIC X(01).
+           05  WS-ADD-AMOUNT               PIC S9(13)V99 COMP-3.
+           05  WS-ADD-BRANCH               PIC X(05).
+
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           MOVE 'INIT' TO TST-FUNCTION
+           MOVE 'CTRRULE' TO TST-SUITE-NAME
+           CALL 'TESTLIB' USING TEST-PARMS
+
+           PERFORM 1000-TEST-THRESHOLD-BOUNDARY
+           PERFORM 1100-TEST-AGGREGATION
+           PERFORM 1200-TEST-NO-NETTING
+           PERFORM 1300-TEST-CASH-OUT
+           PERFORM 1400-TEST-EXEMPTIONS
+           PERFORM 1500-TEST-FILING-DATE
+           PERFORM 1600-TEST-INVALID
+
+           MOVE 'SUMM' TO TST-FUNCTION
+           CALL 'TESTLIB' USING TEST-PARMS
+           STOP RUN.
+
+      *----------------------------------------------------------------*
+       1000-TEST-THRESHOLD-BOUNDARY.
+           PERFORM 8000-RESET
+           MOVE '100000000006' TO WS-ADD-ACCT
+           MOVE 'C' TO WS-ADD-DR-CR
+           MOVE 10000.00 TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           CALL 'CTRRULE' USING CTR-RULE-PARMS
+           MOVE 'DEPOSIT OF EXACTLY 10,000.00 IS NOT REPORTABLE'
+             TO TST-CASE-NAME
+           MOVE 'N' TO TST-EXPECTED
+           MOVE CTP-CTR-REQUIRED TO TST-ACTUAL
+           PERFORM 9100-AEQ
+
+           PERFORM 8000-RESET
+           MOVE 'C' TO WS-ADD-DR-CR
+           MOVE 10000.01 TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           CALL 'CTRRULE' USING CTR-RULE-PARMS
+           MOVE 'DEPOSIT OF 10,000.01 REQUIRES A CTR' TO TST-CASE-NAME
+           MOVE 'Y' TO TST-EXPECTED
+           MOVE CTP-CTR-REQUIRED TO TST-ACTUAL
+           PERFORM 9100-AEQ
+           MOVE 'SINGLE DEPOSIT IS NOT FLAGGED AS AGGREGATED'
+             TO TST-CASE-NAME
+           MOVE 'N' TO TST-EXPECTED
+           MOVE CTP-AGGREGATED-FLAG TO TST-ACTUAL
+           PERFORM 9100-AEQ.
+
+      *----------------------------------------------------------------*
+      * OKAFOR: 6,000 + 5,500 AT TWO BRANCHES INTO TWO ACCOUNTS        *
+      *----------------------------------------------------------------*
+       1100-TEST-AGGREGATION.
+           PERFORM 8000-RESET
+           MOVE '100000000006' TO WS-ADD-ACCT
+           MOVE 'C' TO WS-ADD-DR-CR
+           MOVE 6000.00 TO WS-ADD-AMOUNT
+           MOVE 'B0101' TO WS-ADD-BRANCH
+           PERFORM 8100-ADD
+           MOVE '100000000007' TO WS-ADD-ACCT
+           MOVE 5500.00 TO WS-ADD-AMOUNT
+           MOVE 'B0204' TO WS-ADD-BRANCH
+           PERFORM 8100-ADD
+           CALL 'CTRRULE' USING CTR-RULE-PARMS
+           MOVE 'MULTIPLE DEPOSITS AGGREGATE OVER 10,000 - CTR'
+             TO TST-CASE-NAME
+           MOVE 'Y' TO TST-EXPECTED
+           MOVE CTP-CTR-REQUIRED TO TST-ACTUAL
+           PERFORM 9100-AEQ
+           MOVE 'AGGREGATED CASH IN TOTAL 11,500' TO TST-CASE-NAME
+           MOVE 11500.00 TO TST-EXP-NUM
+           MOVE CTP-CASH-IN-TOTAL TO TST-ACT-NUM
+           PERFORM 9000-NEQ
+           MOVE 'AGGREGATED FLAG SET' TO TST-CASE-NAME
+           MOVE 'Y' TO TST-EXPECTED
+           MOVE CTP-AGGREGATED-FLAG TO TST-ACTUAL
+           PERFORM 9100-AEQ
+           MOVE 'MULTI-BRANCH FLAG SET' TO TST-CASE-NAME
+           MOVE 'Y' TO TST-EXPECTED
+           MOVE CTP-MULTI-BRANCH-FLAG TO TST-ACTUAL
+           PERFORM 9100-AEQ
+           MOVE 'TWO DISTINCT ACCOUNTS COUNTED' TO TST-CASE-NAME
+           MOVE 2 TO TST-EXP-NUM
+           MOVE CTP-ACCOUNT-COUNT TO TST-ACT-NUM
+           PERFORM 9000-NEQ.
+
+      *----------------------------------------------------------------*
+      * 9,000 IN AND 9,000 OUT - 18,000 OF CASH BUT NEITHER DIRECTION  *
+      * EXCEEDS 10,000. IN AND OUT ARE NOT NETTED OR COMBINED.         *
+      *----------------------------------------------------------------*
+       1200-TEST-NO-NETTING.
+           PERFORM 8000-RESET
+           MOVE 'C' TO WS-ADD-DR-CR
+           MOVE 9000.00 TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           MOVE 'D' TO WS-ADD-DR-CR
+           PERFORM 8100-ADD
+           CALL 'CTRRULE' USING CTR-RULE-PARMS
+           MOVE 'IN 9,000 AND OUT 9,000 ARE NOT COMBINED - NO CTR'
+             TO TST-CASE-NAME
+           MOVE 'N' TO TST-EXPECTED
+           MOVE CTP-CTR-REQUIRED TO TST-ACTUAL
+           PERFORM 9100-AEQ
+
+           PERFORM 8000-RESET
+           MOVE 'C' TO WS-ADD-DR-CR
+           MOVE 15000.00 TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           MOVE 'D' TO WS-ADD-DR-CR
+           MOVE 12000.00 TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           CALL 'CTRRULE' USING CTR-RULE-PARMS
+           MOVE 'IN 15,000 OUT 12,000 NOT NETTED - BOTH REPORTABLE'
+             TO TST-CASE-NAME
+           MOVE 'YY' TO TST-EXPECTED
+           MOVE SPACES TO TST-ACTUAL
+           STRING CTP-CASH-IN-REPORTABLE CTP-CASH-OUT-REPORTABLE
+                  DELIMITED BY SIZE INTO TST-ACTUAL
+           PERFORM 9100-AEQ.
+
+      *----------------------------------------------------------------*
+       1300-TEST-CASH-OUT.
+           PERFORM 8000-RESET
+           MOVE 'D' TO WS-ADD-DR-CR
+           MOVE 10000.00 TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           CALL 'CTRRULE' USING CTR-RULE-PARMS
+           MOVE 'WITHDRAWAL OF EXACTLY 10,000.00 - NO CTR'
+             TO TST-CASE-NAME
+           MOVE 'N' TO TST-EXPECTED
+           MOVE CTP-CTR-REQUIRED TO TST-ACTUAL
+           PERFORM 9100-AEQ
+
+           PERFORM 8000-RESET
+           MOVE 'D' TO WS-ADD-DR-CR
+           MOVE 10000.01 TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           CALL 'CTRRULE' USING CTR-RULE-PARMS
+           MOVE 'WITHDRAWAL OF 10,000.01 - CASH OUT REPORTABLE'
+             TO TST-CASE-NAME
+           MOVE 'Y' TO TST-EXPECTED
+           MOVE CTP-CASH-OUT-REPORTABLE TO TST-ACTUAL
+           PERFORM 9100-AEQ.
+
+      *----------------------------------------------------------------*
+       1400-TEST-EXEMPTIONS.
+      *    ACME LOGISTICS - LISTED COMPANY, EXEMPT
+           PERFORM 8000-RESET
+           MOVE 'C000000101' TO CTP-CUST-ID
+           MOVE 'C' TO CTP-CUST-TYPE
+           MOVE 'Y' TO CTP-CTR-EXEMPT-FLAG
+           MOVE '200000000001' TO WS-ADD-ACCT
+           MOVE 'C' TO WS-ADD-DR-CR
+           MOVE 250000.00 TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           CALL 'CTRRULE' USING CTR-RULE-PARMS
+           MOVE 'EXEMPT LISTED COMPANY 250,000 CASH - NO CTR'
+             TO TST-CASE-NAME
+           MOVE 'N' TO TST-EXPECTED
+           MOVE CTP-CTR-REQUIRED TO TST-ACTUAL
+           PERFORM 9100-AEQ
+           MOVE 'EXEMPT PERSON GETS ANNUAL REVIEW NOTE' TO TST-CASE-NAME
+           MOVE 'EY' TO TST-EXPECTED
+           MOVE SPACES TO TST-ACTUAL
+           STRING CTP-EXEMPT-STATUS CTP-EXEMPT-REVIEW-FLAG
+                  DELIMITED BY SIZE INTO TST-ACTUAL
+           PERFORM 9100-AEQ
+
+      *    EXEMPT CUSTOMER BELOW THRESHOLD - NO REVIEW NOTE NEEDED
+           PERFORM 8000-RESET
+           MOVE 'Y' TO CTP-CTR-EXEMPT-FLAG
+           MOVE 'C' TO WS-ADD-DR-CR
+           MOVE 4000.00 TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           CALL 'CTRRULE' USING CTR-RULE-PARMS
+           MOVE 'EXEMPT CUSTOMER BELOW THRESHOLD - NO REVIEW FLAG'
+             TO TST-CASE-NAME
+           MOVE 'N' TO TST-EXPECTED
+           MOVE CTP-EXEMPT-REVIEW-FLAG TO TST-ACTUAL
+           PERFORM 9100-AEQ
+
+      *    QUICKSEND MSB - NOT EXEMPT
+           PERFORM 8000-RESET
+           MOVE 'C000000106' TO CTP-CUST-ID
+           MOVE 'Y' TO CTP-MSB-FLAG
+           MOVE 'C' TO WS-ADD-DR-CR
+           MOVE 45000.00 TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           CALL 'CTRRULE' USING CTR-RULE-PARMS
+           MOVE 'MSB 45,000 CASH DEPOSIT - CTR REQUIRED'
+             TO TST-CASE-NAME
+           MOVE 'Y' TO TST-EXPECTED
+           MOVE CTP-CTR-REQUIRED TO TST-ACTUAL
+           PERFORM 9100-AEQ
+
+      *    MSB WRONGLY FLAGGED EXEMPT - EXEMPTION IGNORED
+           PERFORM 8000-RESET
+           MOVE 'Y' TO CTP-MSB-FLAG CTP-CTR-EXEMPT-FLAG
+           MOVE 'C' TO WS-ADD-DR-CR
+           MOVE 45000.00 TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           CALL 'CTRRULE' USING CTR-RULE-PARMS
+           MOVE 'MSB FLAGGED EXEMPT IS INELIGIBLE - CTR STILL FILED'
+             TO TST-CASE-NAME
+           MOVE 'YI' TO TST-EXPECTED
+           MOVE SPACES TO TST-ACTUAL
+           STRING CTP-CTR-REQUIRED CTP-EXEMPT-STATUS
+                  DELIMITED BY SIZE INTO TST-ACTUAL
+           PERFORM 9100-AEQ.
+
+      *----------------------------------------------------------------*
+       1500-TEST-FILING-DATE.
+           PERFORM 8000-RESET
+           MOVE 'C' TO WS-ADD-DR-CR
+           MOVE 11500.00 TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           CALL 'CTRRULE' USING CTR-RULE-PARMS
+           MOVE 'FILING DUE = TRAN DATE + 15 CALENDAR DAYS'
+             TO TST-CASE-NAME
+           MOVE 20261015 TO TST-EXP-NUM
+           MOVE CTP-FILING-DUE-DATE TO TST-ACT-NUM
+           PERFORM 9000-NEQ
+
+           PERFORM 8000-RESET
+           MOVE 20261223 TO CTP-BUSINESS-DATE
+           MOVE 'C' TO WS-ADD-DR-CR
+           MOVE 11500.00 TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           CALL 'CTRRULE' USING CTR-RULE-PARMS
+           MOVE 'FILING DUE CROSSES YEAR END (NO BUS DAY ROLL)'
+             TO TST-CASE-NAME
+           MOVE 20270107 TO TST-EXP-NUM
+           MOVE CTP-FILING-DUE-DATE TO TST-ACT-NUM
+           PERFORM 9000-NEQ
+
+           PERFORM 8000-RESET
+           MOVE 'C' TO WS-ADD-DR-CR
+           MOVE 500.00 TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           CALL 'CTRRULE' USING CTR-RULE-PARMS
+           MOVE 'NO FILING DATE WHEN NO CTR REQUIRED' TO TST-CASE-NAME
+           MOVE 0 TO TST-EXP-NUM
+           MOVE CTP-FILING-DUE-DATE TO TST-ACT-NUM
+           PERFORM 9000-NEQ.
+
+      *----------------------------------------------------------------*
+       1600-TEST-INVALID.
+           PERFORM 8000-RESET
+           CALL 'CTRRULE' USING CTR-RULE-PARMS
+           MOVE 'NO ITEMS RETURNS RC 12' TO TST-CASE-NAME
+           MOVE 12 TO TST-EXP-NUM
+           MOVE CTP-RETURN-CODE TO TST-ACT-NUM
+           PERFORM 9000-NEQ
+
+           PERFORM 8000-RESET
+           MOVE 20260231 TO CTP-BUSINESS-DATE
+           MOVE 'C' TO WS-ADD-DR-CR
+           MOVE 500.00 TO WS-ADD-AMOUNT
+           PERFORM 8100-ADD
+           CALL 'CTRRULE' USING CTR-RULE-PARMS
+           MOVE 'INVALID BUSINESS DATE RETURNS RC 12' TO TST-CASE-NAME
+           MOVE 12 TO TST-EXP-NUM
+           MOVE CTP-RETURN-CODE TO TST-ACT-NUM
+           PERFORM 9000-NEQ.
+
+      *----------------------------------------------------------------*
+       8000-RESET.
+           INITIALIZE CTR-RULE-PARMS
+           MOVE 20260930   TO CTP-BUSINESS-DATE
+           MOVE 'C000000003' TO CTP-CUST-ID
+           MOVE 'I' TO CTP-CUST-TYPE
+           MOVE 'N' TO CTP-CTR-EXEMPT-FLAG CTP-MSB-FLAG
+           MOVE '100000000006' TO WS-ADD-ACCT
+           MOVE 'B0101' TO WS-ADD-BRANCH.
+
+       8100-ADD.
+           ADD 1 TO CTP-ITEM-COUNT
+           MOVE WS-ADD-ACCT   TO CTP-ITEM-ACCT(CTP-ITEM-COUNT)
+           MOVE WS-ADD-DR-CR  TO CTP-ITEM-DR-CR(CTP-ITEM-COUNT)
+           MOVE WS-ADD-AMOUNT TO CTP-ITEM-AMOUNT(CTP-ITEM-COUNT)
+           MOVE WS-ADD-BRANCH TO CTP-ITEM-BRANCH(CTP-ITEM-COUNT).
+
+       9000-NEQ.
+           MOVE 'NEQ' TO TST-FUNCTION
+           CALL 'TESTLIB' USING TEST-PARMS.
+
+       9100-AEQ.
+           MOVE 'AEQ' TO TST-FUNCTION
+           CALL 'TESTLIB' USING TEST-PARMS
+           MOVE SPACES TO TST-EXPECTED TST-ACTUAL.

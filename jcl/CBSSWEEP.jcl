@@ -1,0 +1,66 @@
+//CBSSWEEP JOB (CBS,TXB),'EOD CASH SWEEPS',CLASS=A,MSGCLASS=X,
+//             MSGLEVEL=(1,1),NOTIFY=&SYSUID,REGION=0M
+//*********************************************************************
+//* JOB      : CBSSWEEP                                               *
+//* PURPOSE  : TRANSACTION BANKING END-OF-DAY SWEEPS (EOD STEP 10).   *
+//*            RUNS AFTER POSTTRAN / HOLDREL SO THAT SWEEPS USE THE   *
+//*            FINAL AVAILABLE BALANCE OF THE DAY, AND BEFORE INTACCR *
+//*            SO THAT INTEREST ACCRUES ON THE POST-SWEEP BALANCE.    *
+//*              - VIRTUAL ACCOUNTS (CVIR) CONCENTRATED TO HEADER     *
+//*              - ZBA SUB-ACCOUNTS (CZBA) TO ZERO AGAINST PARENT     *
+//*              - TARGET / RANGE SWEEPS TO CMMI INVESTMENT ACCOUNTS  *
+//*            DSWP / WSWP PAIRS ARE APPENDED TO TRANPOST (TRAN-ID-SEQ*
+//*            30000000-) AND PICKED UP BY GLEXTR AT EOD STEP 19.     *
+//*            RERUN: RESTORE ACCTMST/SWEEPMST FROM STEP010 BACKUP    *
+//*            AND REMOVE SWEEPRUN ITEMS FROM TRANPOST FIRST - THE    *
+//*            PROGRAM IS NOT RESTARTABLE (SWP-LAST-SWEEP-DATE ONLY   *
+//*            GUARDS SINGLE SWEEP RECORDS).                          *
+//* CHANGE LOG                                                        *
+//* 2001-10-01 BHS  ORIGINAL - TXB CASH CONCENTRATION                 *
+//* 2011-04-12 DPS  CHG1544 SWEEP REPORT TO TREASURY OPS              *
+//* 2019-03-25 AKW  VIRTUAL ACCOUNT CONCENTRATION                     *
+//*********************************************************************
+//JOBLIB   DD DSN=CBS.PROD.LOADLIB,DISP=SHR
+//*
+//*--------------------------------------------------------------------
+//* STEP010 - BACK UP ACCTMST AND SWEEPMST
+//*--------------------------------------------------------------------
+//STEP010  EXEC PGM=IDCAMS
+//SYSPRINT DD SYSOUT=*
+//ACCTIN   DD DSN=CBS.PROD.ACCTMST,DISP=SHR
+//ACCTOUT  DD DSN=CBS.BKUP.ACCTMST.SWEEP(+1),DISP=(NEW,CATLG,DELETE),
+//            SPACE=(CYL,(50,10),RLSE),DCB=(RECFM=VB,LRECL=468)
+//SWPIN    DD DSN=CBS.PROD.SWEEPMST,DISP=SHR
+//SWPOUT   DD DSN=CBS.BKUP.SWEEPMST(+1),DISP=(NEW,CATLG,DELETE),
+//            SPACE=(TRK,(5,5),RLSE),DCB=(RECFM=VB,LRECL=171)
+//SYSIN    DD *
+  REPRO INFILE(ACCTIN) OUTFILE(ACCTOUT)
+  REPRO INFILE(SWPIN)  OUTFILE(SWPOUT)
+/*
+//*
+//*--------------------------------------------------------------------
+//* STEP020 - SWEEPRUN  VIRTUAL / ZBA / TARGET / RANGE SWEEPS
+//*           RC 4 = SWEEP SKIPPED OR ZBA FUNDING SHORT (SWPF ALERT)
+//*--------------------------------------------------------------------
+//STEP020  EXEC PGM=SWEEPRUN,COND=(0,NE,STEP010)
+//STEPLIB  DD DSN=CBS.PROD.LOADLIB,DISP=SHR
+//BANKCTL  DD DSN=CBS.PROD.BANKCTL,DISP=SHR
+//SWEEPMST DD DSN=CBS.PROD.SWEEPMST,DISP=SHR
+//ACCTMST  DD DSN=CBS.PROD.ACCTMST,DISP=SHR
+//TRANPOST DD DSN=CBS.PROD.TRANPOST.DAILY,DISP=MOD
+//ALERTS   DD DSN=CBS.PROD.ALERTS.DAILY,DISP=MOD
+//SWEEPRPT DD DSN=CBS.PROD.RPT.SWEEPRUN(+1),
+//            DISP=(NEW,CATLG,DELETE),SPACE=(TRK,(5,5),RLSE),
+//            DCB=(RECFM=FB,LRECL=132,BLKSIZE=27984)
+//SYSOUT   DD SYSOUT=*
+//SYSUDUMP DD SYSOUT=*
+//*
+//*--------------------------------------------------------------------
+//* STEP030 - SWEEP REPORT TO TREASURY SERVICES (PRINT DEST TXBR)
+//*--------------------------------------------------------------------
+//STEP030  EXEC PGM=IEBGENER,COND=(4,LT,STEP020)
+//SYSPRINT DD SYSOUT=*
+//SYSUT1   DD DSN=CBS.PROD.RPT.SWEEPRUN(+1),DISP=SHR
+//SYSUT2   DD SYSOUT=(R,,TXBR)
+//SYSIN    DD DUMMY
+//

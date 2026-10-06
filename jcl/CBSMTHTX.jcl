@@ -1,0 +1,95 @@
+//CBSMTHTX JOB (CBS,TXB),'TXB MONTH-END',CLASS=A,MSGCLASS=X,
+//             MSGLEVEL=(1,1),NOTIFY=&SYSUID,REGION=0M
+//*********************************************************************
+//* JOB      : CBSMTHTX                                               *
+//* PURPOSE  : TRANSACTION BANKING MONTH-END (EOD STEP 16).           *
+//*              STEP020 ANLYSFEE  ACCOUNT ANALYSIS - EARNINGS CREDIT *
+//*                                VS SERVICE CHARGES, WFAN FEE,      *
+//*                                ANALYSIS STATEMENTS                *
+//*              STEP030 POOLCALC  NOTIONAL POOL INTEREST ALLOCATION  *
+//*                                (DINT CREDIT / ADJD DEBIT INTEREST)*
+//*            ORDER IN THE EOD STREAM: INTCAP, FEEASSES, ANLYSFEE,   *
+//*            POOLCALC, STMTGEN - SO THE FEE AND POOL INTEREST ARE   *
+//*            ON THE MONTH'S STATEMENT. ANLYSFEE COUNTS VOLUMES FROM *
+//*            TRANHIST + TODAY'S TRANPOST, SO IT MUST RUN BEFORE     *
+//*            EODCTL END ROLLS TRANPOST INTO TRANHIST.               *
+//*            BOTH PROGRAMS EXIT RC 0 WHEN CTL-MONTH-END-FLAG IS NOT *
+//*            'Y'. OFF-CYCLE: PARM='FORCE'.                          *
+//*            ANLYCF IS A GDG: (0) = PRIOR MONTH PUBLIC FUNDS CREDIT *
+//*            CARRY-FORWARD, (+1) = THIS MONTH (CHG0731).            *
+//* CHANGE LOG                                                        *
+//* 1994-06-01 RJT  ORIGINAL - ACCOUNT ANALYSIS                       *
+//* 2006-05-22 BHS  CHG0731 ANLYCF CARRY-FORWARD GDG                  *
+//* 2013-06-11 DPS  POOLCALC ADDED (NOTIONAL POOLING)                 *
+//*********************************************************************
+//JOBLIB   DD DSN=CBS.PROD.LOADLIB,DISP=SHR
+//*
+//*--------------------------------------------------------------------
+//* STEP010 - BACK UP ACCTMST AND POOLMST
+//*--------------------------------------------------------------------
+//STEP010  EXEC PGM=IDCAMS
+//SYSPRINT DD SYSOUT=*
+//ACCTIN   DD DSN=CBS.PROD.ACCTMST,DISP=SHR
+//ACCTOUT  DD DSN=CBS.BKUP.ACCTMST.TXBME(+1),DISP=(NEW,CATLG,DELETE),
+//            SPACE=(CYL,(50,10),RLSE),DCB=(RECFM=VB,LRECL=468)
+//POOLIN   DD DSN=CBS.PROD.POOLMST,DISP=SHR
+//POOLOUT  DD DSN=CBS.BKUP.POOLMST(+1),DISP=(NEW,CATLG,DELETE),
+//            SPACE=(TRK,(2,2),RLSE),DCB=(RECFM=VB,LRECL=400)
+//SYSIN    DD *
+  REPRO INFILE(ACCTIN) OUTFILE(ACCTOUT)
+  REPRO INFILE(POOLIN) OUTFILE(POOLOUT)
+/*
+//*
+//*--------------------------------------------------------------------
+//* STEP020 - ANLYSFEE  ACCOUNT ANALYSIS / WFAN SERVICE CHARGE
+//*           TRANPOST IS READ (VOLUMES) AND EXTENDED (WFAN) - DISP=MOD
+//*--------------------------------------------------------------------
+//STEP020  EXEC PGM=ANLYSFEE,COND=(0,NE,STEP010)
+//STEPLIB  DD DSN=CBS.PROD.LOADLIB,DISP=SHR
+//BANKCTL  DD DSN=CBS.PROD.BANKCTL,DISP=SHR
+//ACCTMST  DD DSN=CBS.PROD.ACCTMST,DISP=SHR
+//CUSTMST  DD DSN=CBS.PROD.CUSTMST,DISP=SHR
+//TRANHIST DD DSN=CBS.PROD.TRANHIST(0),DISP=SHR
+//TRANPOST DD DSN=CBS.PROD.TRANPOST.DAILY,DISP=MOD
+//ANLYCFI  DD DSN=CBS.PROD.ANLYCF(0),DISP=SHR
+//ANLYCFO  DD DSN=CBS.PROD.ANLYCF(+1),DISP=(NEW,CATLG,DELETE),
+//            SPACE=(TRK,(1,1),RLSE),
+//            DCB=(RECFM=FB,LRECL=80,BLKSIZE=27920)
+//ANLYSRPT DD DSN=CBS.PROD.RPT.ANLYSFEE(+1),
+//            DISP=(NEW,CATLG,DELETE),SPACE=(TRK,(30,15),RLSE),
+//            DCB=(RECFM=FBA,LRECL=133,BLKSIZE=27930)
+//SYSOUT   DD SYSOUT=*
+//SYSUDUMP DD SYSOUT=*
+//*
+//*--------------------------------------------------------------------
+//* STEP030 - POOLCALC  NOTIONAL POOL INTEREST
+//*           RC 4 = POOL LIMIT BREACHED (LIMT ALERT) - NOT A FAILURE
+//*--------------------------------------------------------------------
+//STEP030  EXEC PGM=POOLCALC,COND=(4,LT,STEP020)
+//STEPLIB  DD DSN=CBS.PROD.LOADLIB,DISP=SHR
+//BANKCTL  DD DSN=CBS.PROD.BANKCTL,DISP=SHR
+//POOLMST  DD DSN=CBS.PROD.POOLMST,DISP=SHR
+//ACCTMST  DD DSN=CBS.PROD.ACCTMST,DISP=SHR
+//TRANPOST DD DSN=CBS.PROD.TRANPOST.DAILY,DISP=MOD
+//ALERTS   DD DSN=CBS.PROD.ALERTS.DAILY,DISP=MOD
+//POOLRPT  DD DSN=CBS.PROD.RPT.POOLCALC(+1),
+//            DISP=(NEW,CATLG,DELETE),SPACE=(TRK,(5,5),RLSE),
+//            DCB=(RECFM=FB,LRECL=132,BLKSIZE=27984)
+//SYSOUT   DD SYSOUT=*
+//SYSUDUMP DD SYSOUT=*
+//*
+//*--------------------------------------------------------------------
+//* STEP040 - ANALYSIS STATEMENTS TO CLIENT SERVICES, POOL REPORT TO
+//*           LIQUIDITY MANAGEMENT
+//*--------------------------------------------------------------------
+//STEP040  EXEC PGM=IEBGENER,COND=(4,LT)
+//SYSPRINT DD SYSOUT=*
+//SYSUT1   DD DSN=CBS.PROD.RPT.ANLYSFEE(+1),DISP=SHR
+//SYSUT2   DD SYSOUT=(S,,ANLS)
+//SYSIN    DD DUMMY
+//STEP050  EXEC PGM=IEBGENER,COND=(4,LT)
+//SYSPRINT DD SYSOUT=*
+//SYSUT1   DD DSN=CBS.PROD.RPT.POOLCALC(+1),DISP=SHR
+//SYSUT2   DD SYSOUT=(R,,LIQM)
+//SYSIN    DD DUMMY
+//
