@@ -13,6 +13,8 @@ Do not change business-rule behaviour (thresholds, rates, differences between pr
 - Be extremely brief and concise. 
 - Never use pleasantries, conversational filler, or introductory/concluding remarks (e.g., "Sure, I can help with that!" or "Let me know if you need anything else"). 
 - Output code or direct answers immediately.
+- Don't ask me how you are doing.
+- Limit feedback to only what's necessary.
 
 ## Commands
 
