@@ -1,6 +1,7 @@
 build/
 data/master/
 data/output/
+.corestory/
 *.dylib
 *.so
 .DS_Store
